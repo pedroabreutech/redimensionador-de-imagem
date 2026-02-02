@@ -9,7 +9,7 @@ st.set_page_config(
 )
 
 st.title("🖼️ Redimensionador de Imagens")
-st.markdown("Redimensione suas imagens por porcentagem mantendo a proporção original")
+st.markdown("Redimensione suas imagens por porcentagem ou definindo dimensões personalizadas")
 
 # Upload de imagem
 uploaded_file = st.file_uploader(
@@ -35,25 +35,96 @@ if uploaded_file is not None:
         # Controles de redimensionamento
         st.subheader("⚙️ Configurações de Redimensionamento")
         
-        col_percent, col_size = st.columns(2)
+        # Seleção do modo de redimensionamento
+        resize_mode = st.radio(
+            "Escolha o modo de redimensionamento:",
+            ["Por Porcentagem", "Dimensões Manuais"],
+            horizontal=True,
+            help="Por Porcentagem: mantém a proporção. Dimensões Manuais: defina largura e altura específicas."
+        )
         
-        with col_percent:
-            percent = st.slider(
-                "Porcentagem de redimensionamento (%)",
-                min_value=1,
-                max_value=500,
-                value=100,
-                step=1,
-                help="100% = tamanho original, 50% = metade do tamanho, 200% = dobro do tamanho"
-            )
+        new_width = image.width
+        new_height = image.height
+        percent = 100
         
-        with col_size:
-            new_width = int(image.width * percent / 100)
-            new_height = int(image.height * percent / 100)
-            st.metric("Novo tamanho", f"{new_width} x {new_height} pixels")
+        if resize_mode == "Por Porcentagem":
+            col_percent, col_size = st.columns(2)
+            
+            with col_percent:
+                percent = st.slider(
+                    "Porcentagem de redimensionamento (%)",
+                    min_value=1,
+                    max_value=500,
+                    value=100,
+                    step=1,
+                    help="100% = tamanho original, 50% = metade do tamanho, 200% = dobro do tamanho"
+                )
+            
+            with col_size:
+                new_width = int(image.width * percent / 100)
+                new_height = int(image.height * percent / 100)
+                st.metric("Novo tamanho", f"{new_width} x {new_height} pixels")
+        else:
+            # Modo manual
+            col_manual1, col_manual2, col_manual3 = st.columns(3)
+            
+            with col_manual1:
+                st.write("**Dimensões Originais:**")
+                st.info(f"Largura: {image.width}px\n\nAltura: {image.height}px")
+            
+            with col_manual2:
+                maintain_ratio = st.checkbox(
+                    "Manter proporção",
+                    value=True,
+                    help="Se marcado, ao alterar uma dimensão, a outra será ajustada automaticamente"
+                )
+            
+            with col_manual3:
+                st.write("**Novas Dimensões:**")
+            
+            col_width, col_height = st.columns(2)
+            
+            with col_width:
+                manual_width = st.number_input(
+                    "Largura (pixels)",
+                    min_value=1,
+                    max_value=10000,
+                    value=image.width,
+                    step=1,
+                    help="Digite a largura desejada em pixels"
+                )
+            
+            with col_height:
+                if maintain_ratio:
+                    # Calcular altura proporcional
+                    ratio = image.height / image.width
+                    calculated_height = int(manual_width * ratio)
+                    st.write("**Altura (pixels):**")
+                    st.info(f"{calculated_height}px\n\n*Calculada automaticamente para manter a proporção*")
+                    manual_height = calculated_height
+                else:
+                    manual_height = st.number_input(
+                        "Altura (pixels)",
+                        min_value=1,
+                        max_value=10000,
+                        value=image.height,
+                        step=1,
+                        help="Digite a altura desejada em pixels"
+                    )
+            
+            new_width = int(manual_width)
+            new_height = int(manual_height)
+            
+            # Calcular porcentagem equivalente para exibição
+            if new_width != image.width:
+                percent = int((new_width / image.width) * 100)
+            elif new_height != image.height:
+                percent = int((new_height / image.height) * 100)
+            else:
+                percent = 100
         
         # Redimensionar imagem
-        if percent != 100:
+        if new_width != image.width or new_height != image.height:
             resized_image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
             
             with col2:
@@ -78,16 +149,24 @@ if uploaded_file is not None:
             
             # Botão de download
             st.subheader("💾 Download")
+            if resize_mode == "Por Porcentagem":
+                file_name = f"redimensionada_{percent}porcento.{save_format.lower()}"
+            else:
+                file_name = f"redimensionada_{new_width}x{new_height}.{save_format.lower()}"
+            
             st.download_button(
                 label=f"⬇️ Baixar imagem redimensionada ({new_width}x{new_height})",
                 data=img_buffer,
-                file_name=f"redimensionada_{percent}porcento.{save_format.lower()}",
+                file_name=file_name,
                 mime=f"image/{save_format.lower()}",
                 type="primary"
             )
         else:
             with col2:
-                st.info("Ajuste a porcentagem para ver a imagem redimensionada")
+                if resize_mode == "Por Porcentagem":
+                    st.info("Ajuste a porcentagem para ver a imagem redimensionada")
+                else:
+                    st.info("Ajuste as dimensões para ver a imagem redimensionada")
     except Exception as e:
         st.error(f"Erro ao processar a imagem: {str(e)}")
         st.info("Por favor, verifique se o arquivo é uma imagem válida.")
@@ -97,14 +176,22 @@ else:
     # Exemplo de uso
     with st.expander("ℹ️ Como usar"):
         st.markdown("""
+        ### Modo Por Porcentagem:
         1. **Faça upload** de uma imagem usando o botão acima
-        2. **Ajuste a porcentagem** usando o slider (1% a 500%)
-        3. **Visualize** a imagem redimensionada ao lado
-        4. **Baixe** a imagem redimensionada usando o botão de download
+        2. Selecione **"Por Porcentagem"**
+        3. **Ajuste a porcentagem** usando o slider (1% a 500%)
+        4. **Visualize** a imagem redimensionada ao lado
+        5. **Baixe** a imagem redimensionada
+        
+        ### Modo Dimensões Manuais:
+        1. **Faça upload** de uma imagem usando o botão acima
+        2. Selecione **"Dimensões Manuais"**
+        3. **Digite** a largura e altura desejadas em pixels
+        4. Marque **"Manter proporção"** para ajuste automático
+        5. **Visualize** e **baixe** a imagem redimensionada
         
         **Dicas:**
-        - 50% = metade do tamanho original
-        - 100% = tamanho original
-        - 200% = dobro do tamanho original
-        - A proporção da imagem é sempre mantida
+        - **Por Porcentagem**: 50% = metade, 100% = original, 200% = dobro
+        - **Dimensões Manuais**: Controle total sobre largura e altura
+        - A proporção pode ser mantida ou alterada conforme sua escolha
         """)

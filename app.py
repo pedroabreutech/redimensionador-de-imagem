@@ -8,8 +8,60 @@ st.set_page_config(
     layout="wide"
 )
 
+# Dicionário com dimensões das redes sociais
+SOCIAL_MEDIA_PRESETS = {
+    "Instagram": {
+        "Feed (Post Quadrado)": (1080, 1080),
+        "Feed (Post Retrato)": (1080, 1350),
+        "Feed (Post Paisagem)": (1080, 566),
+        "Stories": (1080, 1920),
+        "Reels": (1080, 1920),
+        "IGTV/Cover": (1080, 1920),
+        "Perfil": (320, 320)
+    },
+    "Facebook": {
+        "Post no Feed": (1200, 630),
+        "Post Quadrado": (1200, 1200),
+        "Capa": (1640, 859),
+        "Perfil": (400, 400),
+        "Stories": (1080, 1920),
+        "Evento": (1920, 1080)
+    },
+    "Twitter/X": {
+        "Post com Imagem": (1200, 675),
+        "Post Quadrado": (1200, 1200),
+        "Header": (1500, 500),
+        "Perfil": (400, 400)
+    },
+    "LinkedIn": {
+        "Post no Feed": (1200, 627),
+        "Post Quadrado": (1200, 1200),
+        "Capa": (1584, 396),
+        "Perfil": (400, 400),
+        "Banner de Empresa": (1128, 191)
+    },
+    "TikTok": {
+        "Vídeo/Post": (1080, 1920),
+        "Perfil": (200, 200)
+    },
+    "YouTube": {
+        "Thumbnail": (1280, 720),
+        "Banner": (2560, 1440),
+        "Perfil": (800, 800)
+    },
+    "Pinterest": {
+        "Pin Padrão": (1000, 1500),
+        "Pin Quadrado": (1000, 1000),
+        "Pin Longo": (1000, 2100)
+    },
+    "WhatsApp": {
+        "Status": (1080, 1920),
+        "Perfil": (640, 640)
+    }
+}
+
 st.title("🖼️ Redimensionador de Imagens")
-st.markdown("Redimensione suas imagens por porcentagem ou definindo dimensões personalizadas")
+st.markdown("Redimensione suas imagens usando presets de redes sociais, por porcentagem ou definindo dimensões personalizadas")
 
 # Upload de imagem
 uploaded_file = st.file_uploader(
@@ -38,16 +90,81 @@ if uploaded_file is not None:
         # Seleção do modo de redimensionamento
         resize_mode = st.radio(
             "Escolha o modo de redimensionamento:",
-            ["Por Porcentagem", "Dimensões Manuais"],
+            ["Presets de Redes Sociais", "Por Porcentagem", "Dimensões Manuais"],
             horizontal=True,
-            help="Por Porcentagem: mantém a proporção. Dimensões Manuais: defina largura e altura específicas."
+            help="Presets: dimensões prontas para redes sociais. Por Porcentagem: mantém a proporção. Dimensões Manuais: defina largura e altura específicas."
         )
         
         new_width = image.width
         new_height = image.height
         percent = 100
+        selected_social = None
+        selected_preset = None
         
-        if resize_mode == "Por Porcentagem":
+        if resize_mode == "Presets de Redes Sociais":
+            # Seleção de rede social
+            col_social1, col_social2 = st.columns(2)
+            
+            with col_social1:
+                selected_social = st.selectbox(
+                    "🌐 Escolha a rede social:",
+                    options=list(SOCIAL_MEDIA_PRESETS.keys()),
+                    help="Selecione a rede social para ver as dimensões disponíveis"
+                )
+            
+            if selected_social:
+                # Seleção do tipo de conteúdo
+                with col_social2:
+                    preset_options = list(SOCIAL_MEDIA_PRESETS[selected_social].keys())
+                    selected_preset = st.selectbox(
+                        "📐 Escolha o tipo de conteúdo:",
+                        options=preset_options,
+                        help="Selecione o tipo de conteúdo para aplicar as dimensões recomendadas"
+                    )
+                
+                if selected_preset:
+                    # Aplicar dimensões do preset
+                    preset_width, preset_height = SOCIAL_MEDIA_PRESETS[selected_social][selected_preset]
+                    new_width = preset_width
+                    new_height = preset_height
+                    
+                    # Calcular porcentagem equivalente
+                    if new_width != image.width:
+                        percent = int((new_width / image.width) * 100)
+                    elif new_height != image.height:
+                        percent = int((new_height / image.height) * 100)
+                    else:
+                        percent = 100
+                    
+                    # Mostrar informações do preset
+                    st.info(f"📏 **Dimensões para {selected_social} - {selected_preset}:** {preset_width} x {preset_height} pixels")
+                    
+                    # Opção para ajustar manualmente se necessário
+                    adjust_manual = st.checkbox(
+                        "Ajustar dimensões manualmente",
+                        help="Marque para ajustar as dimensões do preset manualmente"
+                    )
+                    
+                    if adjust_manual:
+                        col_adj_width, col_adj_height = st.columns(2)
+                        with col_adj_width:
+                            new_width = st.number_input(
+                                "Largura (pixels)",
+                                min_value=1,
+                                max_value=10000,
+                                value=preset_width,
+                                step=1
+                            )
+                        with col_adj_height:
+                            new_height = st.number_input(
+                                "Altura (pixels)",
+                                min_value=1,
+                                max_value=10000,
+                                value=preset_height,
+                                step=1
+                            )
+        
+        elif resize_mode == "Por Porcentagem":
             col_percent, col_size = st.columns(2)
             
             with col_percent:
@@ -149,7 +266,11 @@ if uploaded_file is not None:
             
             # Botão de download
             st.subheader("💾 Download")
-            if resize_mode == "Por Porcentagem":
+            if resize_mode == "Presets de Redes Sociais" and selected_social and selected_preset:
+                safe_social = selected_social.lower().replace("/", "_").replace(" ", "_")
+                safe_preset = selected_preset.lower().replace("/", "_").replace(" ", "_")
+                file_name = f"{safe_social}_{safe_preset}_{new_width}x{new_height}.{save_format.lower()}"
+            elif resize_mode == "Por Porcentagem":
                 file_name = f"redimensionada_{percent}porcento.{save_format.lower()}"
             else:
                 file_name = f"redimensionada_{new_width}x{new_height}.{save_format.lower()}"
@@ -163,7 +284,9 @@ if uploaded_file is not None:
             )
         else:
             with col2:
-                if resize_mode == "Por Porcentagem":
+                if resize_mode == "Presets de Redes Sociais":
+                    st.info("Selecione uma rede social e tipo de conteúdo para ver a imagem redimensionada")
+                elif resize_mode == "Por Porcentagem":
                     st.info("Ajuste a porcentagem para ver a imagem redimensionada")
                 else:
                     st.info("Ajuste as dimensões para ver a imagem redimensionada")
@@ -176,6 +299,14 @@ else:
     # Exemplo de uso
     with st.expander("ℹ️ Como usar"):
         st.markdown("""
+        ### Modo Presets de Redes Sociais:
+        1. **Faça upload** de uma imagem usando o botão acima
+        2. Selecione **"Presets de Redes Sociais"**
+        3. **Escolha a rede social** (Instagram, Facebook, Twitter, etc.)
+        4. **Escolha o tipo de conteúdo** (Feed, Stories, Perfil, etc.)
+        5. As dimensões serão aplicadas automaticamente
+        6. **Visualize** e **baixe** a imagem redimensionada
+        
         ### Modo Por Porcentagem:
         1. **Faça upload** de uma imagem usando o botão acima
         2. Selecione **"Por Porcentagem"**
@@ -191,6 +322,7 @@ else:
         5. **Visualize** e **baixe** a imagem redimensionada
         
         **Dicas:**
+        - **Presets**: Dimensões otimizadas para cada rede social
         - **Por Porcentagem**: 50% = metade, 100% = original, 200% = dobro
         - **Dimensões Manuais**: Controle total sobre largura e altura
         - A proporção pode ser mantida ou alterada conforme sua escolha

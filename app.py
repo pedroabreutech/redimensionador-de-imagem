@@ -240,14 +240,85 @@ if uploaded_file is not None:
             else:
                 percent = 100
         
-        # Redimensionar imagem
+        # Método de redimensionamento (apenas se as dimensões forem diferentes)
+        resize_method = "Distorcer"  # Padrão
+        resized_image = None
+        
         if new_width != image.width or new_height != image.height:
-            resized_image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+            # Calcular proporções
+            original_ratio = image.width / image.height
+            target_ratio = new_width / new_height
             
+            # Se as proporções forem diferentes, oferecer opções
+            if abs(original_ratio - target_ratio) > 0.01:  # Tolerância para diferenças pequenas
+                resize_method = st.radio(
+                    "⚠️ As proporções são diferentes. Como deseja redimensionar?",
+                    ["Distorcer", "Cortar (Crop)", "Adicionar barras (Padding)"],
+                    horizontal=True,
+                    help="Distorcer: estica a imagem. Cortar: mantém proporção cortando partes. Padding: adiciona barras para manter proporção."
+                )
+            else:
+                # Proporções iguais, apenas redimensionar normalmente
+                resize_method = "Distorcer"
+            
+            # Aplicar método de redimensionamento
+            if resize_method == "Distorcer":
+                resized_image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+            elif resize_method == "Cortar (Crop)":
+                # Calcular escala para manter proporção e preencher o tamanho alvo
+                scale = max(new_width / image.width, new_height / image.height)
+                scaled_width = int(image.width * scale)
+                scaled_height = int(image.height * scale)
+                
+                # Redimensionar mantendo proporção
+                temp_image = image.resize((scaled_width, scaled_height), Image.Resampling.LANCZOS)
+                
+                # Calcular posição para centralizar o crop
+                left = (scaled_width - new_width) // 2
+                top = (scaled_height - new_height) // 2
+                right = left + new_width
+                bottom = top + new_height
+                
+                # Cortar a imagem
+                resized_image = temp_image.crop((left, top, right, bottom))
+            else:  # Padding
+                # Calcular escala para manter proporção e caber no tamanho alvo
+                scale = min(new_width / image.width, new_height / image.height)
+                scaled_width = int(image.width * scale)
+                scaled_height = int(image.height * scale)
+                
+                # Redimensionar mantendo proporção
+                temp_image = image.resize((scaled_width, scaled_height), Image.Resampling.LANCZOS)
+                
+                # Converter para RGBA se necessário para suportar transparência
+                if temp_image.mode != 'RGBA':
+                    temp_image = temp_image.convert('RGBA')
+                
+                # Criar imagem com fundo transparente
+                resized_image = Image.new('RGBA', (new_width, new_height), (255, 255, 255, 0))
+                
+                # Centralizar a imagem redimensionada
+                paste_x = (new_width - scaled_width) // 2
+                paste_y = (new_height - scaled_height) // 2
+                
+                # Colar a imagem mantendo transparência
+                resized_image.paste(temp_image, (paste_x, paste_y), temp_image)
+            
+            # Mostrar resultado
             with col2:
                 st.subheader("✨ Imagem Redimensionada")
                 st.image(resized_image, caption=f"Tamanho redimensionado: {new_width} x {new_height} pixels", use_container_width=True)
-                st.success(f"**Dimensões:** {new_width} x {new_height} pixels\n\n**Redimensionamento:** {percent}%")
+                
+                # Mensagem com método usado
+                method_text = ""
+                if resize_method == "Cortar (Crop)":
+                    method_text = "\n\n**Método:** Cortar (mantém proporção)"
+                elif resize_method == "Adicionar barras (Padding)":
+                    method_text = "\n\n**Método:** Padding (mantém proporção com barras)"
+                else:
+                    method_text = "\n\n**Método:** Redimensionar (pode distorcer)"
+                
+                st.success(f"**Dimensões:** {new_width} x {new_height} pixels\n\n**Redimensionamento:** {percent}%{method_text}")
             
             # Preparar imagem para download
             img_buffer = io.BytesIO()

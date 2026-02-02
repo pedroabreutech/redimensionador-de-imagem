@@ -13,7 +13,22 @@ Uma aplicação web simples e intuitiva para redimensionar imagens por porcentag
 
 ## 📦 Instalação
 
-1. Instale as dependências:
+### 1. Clone o repositório
+
+```bash
+git clone https://github.com/pedroabreutech/redimensionador-de-imagem.git
+cd redimensionador-de-imagem
+```
+
+### 2. Crie um ambiente virtual (recomendado)
+
+```bash
+python3 -m venv venv
+source venv/bin/activate  # No Windows: venv\Scripts\activate
+```
+
+### 3. Instale as dependências
+
 ```bash
 pip install -r requirements.txt
 ```
@@ -25,10 +40,11 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-2. Faça upload de uma imagem
-3. Ajuste a porcentagem de redimensionamento usando o slider
-4. Visualize o resultado
-5. Baixe a imagem redimensionada
+2. A aplicação abrirá automaticamente no navegador (geralmente em `http://localhost:8501`)
+3. Faça upload de uma imagem
+4. Ajuste a porcentagem de redimensionamento usando o slider
+5. Visualize o resultado
+6. Baixe a imagem redimensionada
 
 ## 📋 Requisitos
 

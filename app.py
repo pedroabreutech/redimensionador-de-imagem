@@ -1,6 +1,9 @@
 import streamlit as st
 from PIL import Image
 import io
+import json
+import numpy as np
+from streamlit_drawable_canvas import st_canvas
 
 st.set_page_config(
     page_title="Redimensionador de Imagens",
@@ -63,8 +66,11 @@ SOCIAL_MEDIA_PRESETS = {
 st.title("🖼️ Redimensionador de Imagens")
 st.markdown("Redimensione suas imagens usando presets de redes sociais, por porcentagem ou definindo dimensões personalizadas")
 
-# Upload de imagem
-uploaded_file = st.file_uploader(
+# Menu lateral
+st.sidebar.title("⚙️ Configurações")
+
+# Upload de imagem (menu lateral)
+uploaded_file = st.sidebar.file_uploader(
     "Faça upload de uma imagem",
     type=['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp'],
     help="Formatos suportados: PNG, JPG, JPEG, GIF, BMP, WEBP"
@@ -84,14 +90,13 @@ if uploaded_file is not None:
             st.image(image, caption=f"Tamanho original: {image.width} x {image.height} pixels", use_container_width=True)
             st.info(f"**Formato:** {original_format}\n\n**Dimensões:** {image.width} x {image.height} pixels")
         
-        # Controles de redimensionamento
-        st.subheader("⚙️ Configurações de Redimensionamento")
+        # Controles de redimensionamento (menu lateral)
+        st.sidebar.subheader("⚙️ Configurações de Redimensionamento")
         
-        # Seleção do modo de redimensionamento
-        resize_mode = st.radio(
+        # Seleção do modo de redimensionamento (menu lateral)
+        resize_mode = st.sidebar.radio(
             "Escolha o modo de redimensionamento:",
             ["Presets de Redes Sociais", "Por Porcentagem", "Dimensões Manuais"],
-            horizontal=True,
             help="Presets: dimensões prontas para redes sociais. Por Porcentagem: mantém a proporção. Dimensões Manuais: defina largura e altura específicas."
         )
         
@@ -101,26 +106,23 @@ if uploaded_file is not None:
         selected_social = None
         selected_preset = None
         
+        # Todas as opções de configuração ficam no menu lateral
         if resize_mode == "Presets de Redes Sociais":
-            # Seleção de rede social
-            col_social1, col_social2 = st.columns(2)
-            
-            with col_social1:
-                selected_social = st.selectbox(
-                    "🌐 Escolha a rede social:",
-                    options=list(SOCIAL_MEDIA_PRESETS.keys()),
-                    help="Selecione a rede social para ver as dimensões disponíveis"
-                )
+            # Seleção de rede social (lateral)
+            selected_social = st.sidebar.selectbox(
+                "🌐 Escolha a rede social:",
+                options=list(SOCIAL_MEDIA_PRESETS.keys()),
+                help="Selecione a rede social para ver as dimensões disponíveis"
+            )
             
             if selected_social:
-                # Seleção do tipo de conteúdo
-                with col_social2:
-                    preset_options = list(SOCIAL_MEDIA_PRESETS[selected_social].keys())
-                    selected_preset = st.selectbox(
-                        "📐 Escolha o tipo de conteúdo:",
-                        options=preset_options,
-                        help="Selecione o tipo de conteúdo para aplicar as dimensões recomendadas"
-                    )
+                # Seleção do tipo de conteúdo (lateral)
+                preset_options = list(SOCIAL_MEDIA_PRESETS[selected_social].keys())
+                selected_preset = st.sidebar.selectbox(
+                    "📐 Escolha o tipo de conteúdo:",
+                    options=preset_options,
+                    help="Selecione o tipo de conteúdo para aplicar as dimensões recomendadas"
+                )
                 
                 if selected_preset:
                     # Aplicar dimensões do preset
@@ -136,98 +138,82 @@ if uploaded_file is not None:
                     else:
                         percent = 100
                     
-                    # Mostrar informações do preset
-                    st.info(f"📏 **Dimensões para {selected_social} - {selected_preset}:** {preset_width} x {preset_height} pixels")
+                    # Mostrar informações do preset (lateral)
+                    st.sidebar.info(f"📏 **Dimensões para {selected_social} - {selected_preset}:** {preset_width} x {preset_height} pixels")
                     
-                    # Opção para ajustar manualmente se necessário
-                    adjust_manual = st.checkbox(
+                    # Opção para ajustar manualmente se necessário (lateral)
+                    adjust_manual = st.sidebar.checkbox(
                         "Ajustar dimensões manualmente",
                         help="Marque para ajustar as dimensões do preset manualmente"
                     )
                     
                     if adjust_manual:
-                        col_adj_width, col_adj_height = st.columns(2)
-                        with col_adj_width:
-                            new_width = st.number_input(
-                                "Largura (pixels)",
-                                min_value=1,
-                                max_value=10000,
-                                value=preset_width,
-                                step=1
-                            )
-                        with col_adj_height:
-                            new_height = st.number_input(
-                                "Altura (pixels)",
-                                min_value=1,
-                                max_value=10000,
-                                value=preset_height,
-                                step=1
-                            )
+                        new_width = st.sidebar.number_input(
+                            "Largura (pixels)",
+                            min_value=1,
+                            max_value=10000,
+                            value=preset_width,
+                            step=1
+                        )
+                        new_height = st.sidebar.number_input(
+                            "Altura (pixels)",
+                            min_value=1,
+                            max_value=10000,
+                            value=preset_height,
+                            step=1
+                        )
         
         elif resize_mode == "Por Porcentagem":
-            col_percent, col_size = st.columns(2)
+            # Slider de porcentagem no menu lateral
+            percent = st.sidebar.slider(
+                "Porcentagem de redimensionamento (%)",
+                min_value=1,
+                max_value=500,
+                value=100,
+                step=1,
+                help="100% = tamanho original, 50% = metade do tamanho, 200% = dobro do tamanho"
+            )
             
-            with col_percent:
-                percent = st.slider(
-                    "Porcentagem de redimensionamento (%)",
-                    min_value=1,
-                    max_value=500,
-                    value=100,
-                    step=1,
-                    help="100% = tamanho original, 50% = metade do tamanho, 200% = dobro do tamanho"
-                )
-            
-            with col_size:
-                new_width = int(image.width * percent / 100)
-                new_height = int(image.height * percent / 100)
-                st.metric("Novo tamanho", f"{new_width} x {new_height} pixels")
+            # Cálculo do novo tamanho exibido ao lado da imagem
+            new_width = int(image.width * percent / 100)
+            new_height = int(image.height * percent / 100)
+            st.metric("Novo tamanho", f"{new_width} x {new_height} pixels")
         else:
-            # Modo manual
-            col_manual1, col_manual2, col_manual3 = st.columns(3)
+            # Modo manual (menu lateral)
+            st.sidebar.markdown("**Dimensões Originais:**")
+            st.sidebar.info(f"Largura: {image.width}px\n\nAltura: {image.height}px")
             
-            with col_manual1:
-                st.write("**Dimensões Originais:**")
-                st.info(f"Largura: {image.width}px\n\nAltura: {image.height}px")
+            maintain_ratio = st.sidebar.checkbox(
+                "Manter proporção",
+                value=True,
+                help="Se marcado, ao alterar uma dimensão, a outra será ajustada automaticamente"
+            )
             
-            with col_manual2:
-                maintain_ratio = st.checkbox(
-                    "Manter proporção",
-                    value=True,
-                    help="Se marcado, ao alterar uma dimensão, a outra será ajustada automaticamente"
-                )
+            manual_width = st.sidebar.number_input(
+                "Largura (pixels)",
+                min_value=1,
+                max_value=10000,
+                value=image.width,
+                step=1,
+                help="Digite a largura desejada em pixels"
+            )
             
-            with col_manual3:
-                st.write("**Novas Dimensões:**")
-            
-            col_width, col_height = st.columns(2)
-            
-            with col_width:
-                manual_width = st.number_input(
-                    "Largura (pixels)",
+            if maintain_ratio:
+                # Calcular altura proporcional
+                ratio = image.height / image.width
+                calculated_height = int(manual_width * ratio)
+                st.sidebar.markdown("**Altura (pixels):**")
+                st.sidebar.info(f"{calculated_height}px\n\n*Calculada automaticamente para manter a proporção*")
+                manual_height = calculated_height
+            else:
+                manual_height = st.sidebar.number_input(
+                    "Altura (pixels)",
                     min_value=1,
                     max_value=10000,
-                    value=image.width,
+                    value=image.height,
                     step=1,
-                    help="Digite a largura desejada em pixels"
+                    help="Digite a altura desejada em pixels"
                 )
-            
-            with col_height:
-                if maintain_ratio:
-                    # Calcular altura proporcional
-                    ratio = image.height / image.width
-                    calculated_height = int(manual_width * ratio)
-                    st.write("**Altura (pixels):**")
-                    st.info(f"{calculated_height}px\n\n*Calculada automaticamente para manter a proporção*")
-                    manual_height = calculated_height
-                else:
-                    manual_height = st.number_input(
-                        "Altura (pixels)",
-                        min_value=1,
-                        max_value=10000,
-                        value=image.height,
-                        step=1,
-                        help="Digite a altura desejada em pixels"
-                    )
             
             new_width = int(manual_width)
             new_height = int(manual_height)
@@ -265,6 +251,9 @@ if uploaded_file is not None:
             if resize_method == "Distorcer":
                 resized_image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
             elif resize_method == "Cortar (Crop)":
+                st.markdown("**✂️ Selecione a área de corte diretamente na imagem:**")
+                st.info("💡 **Como usar:** Clique e arraste na imagem abaixo para selecionar a área que deseja cortar. A área selecionada será redimensionada para as dimensões desejadas.")
+                
                 # Calcular escala para manter proporção e preencher o tamanho alvo
                 scale = max(new_width / image.width, new_height / image.height)
                 scaled_width = int(image.width * scale)
@@ -273,14 +262,101 @@ if uploaded_file is not None:
                 # Redimensionar mantendo proporção
                 temp_image = image.resize((scaled_width, scaled_height), Image.Resampling.LANCZOS)
                 
-                # Calcular posição para centralizar o crop
-                left = (scaled_width - new_width) // 2
-                top = (scaled_height - new_height) // 2
-                right = left + new_width
-                bottom = top + new_height
+                # Calcular dimensões do canvas (limitar a 800px de largura para melhor UX)
+                canvas_width = min(800, scaled_width)
+                canvas_height = int(canvas_width * scaled_height / scaled_width)
                 
-                # Cortar a imagem
-                resized_image = temp_image.crop((left, top, right, bottom))
+                # Redimensionar a imagem para o tamanho do canvas para exibição
+                display_image = temp_image.resize((canvas_width, canvas_height), Image.Resampling.LANCZOS)
+                
+                # Converter para RGB se necessário (st_canvas funciona melhor com RGB)
+                if display_image.mode != 'RGB':
+                    display_image = display_image.convert('RGB')
+                
+                # Criar uma cópia nova da imagem para evitar problemas de referência
+                canvas_bg_image = Image.new('RGB', (canvas_width, canvas_height))
+                canvas_bg_image.paste(display_image, (0, 0))
+                
+                # Canvas para seleção - usar apenas o canvas, sem fallback
+                canvas_result = st_canvas(
+                    fill_color="rgba(255, 165, 0, 0.3)",
+                    stroke_width=2,
+                    stroke_color="#FF6600",
+                    background_image=canvas_bg_image,
+                    update_streamlit=True,
+                    width=canvas_width,
+                    height=canvas_height,
+                    drawing_mode="rect",
+                    point_display_radius=0,
+                    key=f"crop_canvas_{new_width}_{new_height}",
+                )
+                
+                # Processar seleção do canvas
+                if canvas_result.json_data is not None:
+                    objects = json.loads(canvas_result.json_data)
+                    
+                    # Procurar por retângulos desenhados
+                    crop_rect = None
+                    if "objects" in objects:
+                        for obj in objects["objects"]:
+                            if obj.get("type") == "rect":
+                                crop_rect = obj
+                                break
+                    
+                    if crop_rect:
+                        # Obter coordenadas do retângulo no canvas
+                        canvas_x = crop_rect.get("left", 0)
+                        canvas_y = crop_rect.get("top", 0)
+                        canvas_w = crop_rect.get("width", 0)
+                        canvas_h = crop_rect.get("height", 0)
+                        
+                        # Converter coordenadas do canvas para coordenadas da imagem real
+                        scale_x = scaled_width / canvas_width
+                        scale_y = scaled_height / canvas_height
+                        
+                        # Se o usuário desenhou um retângulo válido, usar o centro da seleção
+                        if canvas_w > 10 and canvas_h > 10:
+                            # Calcular o centro da seleção do usuário
+                            canvas_center_x = canvas_x + canvas_w / 2
+                            canvas_center_y = canvas_y + canvas_h / 2
+                            
+                            # Converter para coordenadas da imagem real
+                            real_center_x = canvas_center_x * scale_x
+                            real_center_y = canvas_center_y * scale_y
+                            
+                            # Calcular posição do crop centrado na seleção do usuário
+                            left = int(real_center_x - new_width / 2)
+                            top = int(real_center_y - new_height / 2)
+                            
+                            # Garantir que não exceda os limites da imagem
+                            left = max(0, min(left, scaled_width - new_width))
+                            top = max(0, min(top, scaled_height - new_height))
+                            right = left + new_width
+                            bottom = top + new_height
+                            
+                            # Cortar a imagem usando a posição baseada na seleção do usuário
+                            resized_image = temp_image.crop((left, top, right, bottom))
+                        else:
+                            # Seleção muito pequena, usar crop centralizado padrão
+                            left = (scaled_width - new_width) // 2
+                            top = (scaled_height - new_height) // 2
+                            right = left + new_width
+                            bottom = top + new_height
+                            resized_image = temp_image.crop((left, top, right, bottom))
+                    else:
+                        # Nenhuma seleção, usar crop centralizado padrão
+                        left = (scaled_width - new_width) // 2
+                        top = (scaled_height - new_height) // 2
+                        right = left + new_width
+                        bottom = top + new_height
+                        resized_image = temp_image.crop((left, top, right, bottom))
+                else:
+                    # Nenhuma seleção ainda, usar crop centralizado padrão
+                    left = (scaled_width - new_width) // 2
+                    top = (scaled_height - new_height) // 2
+                    right = left + new_width
+                    bottom = top + new_height
+                    resized_image = temp_image.crop((left, top, right, bottom))
             else:  # Padding
                 # Calcular escala para manter proporção e caber no tamanho alvo
                 scale = min(new_width / image.width, new_height / image.height)
@@ -323,14 +399,23 @@ if uploaded_file is not None:
             # Preparar imagem para download
             img_buffer = io.BytesIO()
             
-            # Manter o formato original ou converter para PNG se necessário
-            save_format = original_format
-            if original_format == 'JPEG':
-                save_format = 'JPEG'
-            elif original_format == 'PNG':
-                save_format = 'PNG'
+            # Escolha do formato de saída no menu lateral
+            output_format_option = st.sidebar.selectbox(
+                "Formato de saída",
+                ["Manter formato original", "JPEG", "PNG", "WEBP"],
+                help="Escolha o formato do arquivo final."
+            )
+            
+            # Definir formato a ser usado
+            if output_format_option == "Manter formato original":
+                # Manter o formato original, com fallback para PNG
+                save_format = original_format if original_format in ["JPEG", "PNG", "WEBP"] else "PNG"
             else:
-                save_format = 'PNG'  # Padrão para outros formatos
+                save_format = output_format_option
+            
+            # Ajustar modo da imagem para formatos que não suportam transparência (ex.: JPEG)
+            if save_format == "JPEG" and resized_image.mode in ["RGBA", "LA", "P"]:
+                resized_image = resized_image.convert("RGB")
             
             resized_image.save(img_buffer, format=save_format, quality=95)
             img_buffer.seek(0)
@@ -398,3 +483,77 @@ else:
         - **Dimensões Manuais**: Controle total sobre largura e altura
         - A proporção pode ser mantida ou alterada conforme sua escolha
         """)
+
+# -------------------------------------------------------------
+# Conversor de arquivos de imagem (ferramenta independente)
+# -------------------------------------------------------------
+
+st.sidebar.markdown("---")
+st.sidebar.subheader("🗂 Conversor de Imagens")
+
+converter_file = st.sidebar.file_uploader(
+    "Selecione uma imagem para converter",
+    type=['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'tiff'],
+    key="converter_uploader",
+    help="Envie uma imagem para apenas converter o formato, sem redimensionar."
+)
+
+converter_output_format = st.sidebar.selectbox(
+    "Formato de saída do conversor",
+    ["JPEG", "PNG", "WEBP", "BMP", "TIFF"],
+    index=1,
+    help="Formato do arquivo convertido."
+)
+
+converter_quality = st.sidebar.slider(
+    "Qualidade (para JPEG/WEBP)",
+    min_value=10,
+    max_value=100,
+    value=90,
+    step=5,
+    help="Afeta apenas formatos com qualidade configurável (JPEG e WEBP)."
+)
+
+if converter_file is not None:
+    try:
+        conv_image = Image.open(converter_file)
+        conv_original_format = conv_image.format or "Desconhecido"
+        
+        conv_col1, conv_col2 = st.columns(2)
+        
+        with conv_col1:
+            st.subheader("🗂 Conversor de Imagens")
+            st.image(conv_image, caption=f"Imagem original ({conv_original_format})", use_container_width=True)
+            st.info(f"**Formato original:** {conv_original_format}\n\n**Dimensões:** {conv_image.width} x {conv_image.height} pixels")
+        
+        # Preparar conversão
+        conv_buffer = io.BytesIO()
+        conv_save_format = converter_output_format.upper()
+        
+        # Ajustar modo para formatos sem transparência
+        conv_to_save = conv_image
+        if conv_save_format in ["JPEG", "BMP"] and conv_image.mode in ["RGBA", "LA", "P"]:
+            conv_to_save = conv_image.convert("RGB")
+        
+        save_kwargs = {}
+        if conv_save_format in ["JPEG", "WEBP"]:
+            save_kwargs["quality"] = int(converter_quality)
+        
+        conv_to_save.save(conv_buffer, format=conv_save_format, **save_kwargs)
+        conv_buffer.seek(0)
+        
+        with conv_col2:
+            st.subheader("📥 Download da imagem convertida")
+            conv_file_name_base = converter_file.name.rsplit(".", 1)[0]
+            conv_file_name = f"{conv_file_name_base}_convertida.{conv_save_format.lower()}"
+            
+            st.download_button(
+                label=f"⬇️ Baixar imagem convertida ({conv_save_format})",
+                data=conv_buffer,
+                file_name=conv_file_name,
+                mime=f"image/{conv_save_format.lower()}",
+                type="primary",
+            )
+    except Exception as e:
+        st.error(f"Erro ao converter a imagem: {str(e)}")
+        st.info("Verifique se o arquivo enviado é uma imagem válida.")

@@ -1,9 +1,6 @@
 import streamlit as st
 from PIL import Image
 import io
-import json
-import numpy as np
-from streamlit_drawable_canvas import st_canvas
 
 st.set_page_config(
     page_title="Redimensionador de Imagens",
@@ -251,8 +248,8 @@ if uploaded_file is not None:
             if resize_method == "Distorcer":
                 resized_image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
             elif resize_method == "Cortar (Crop)":
-                st.markdown("**✂️ Selecione a área de corte diretamente na imagem:**")
-                st.info("💡 **Como usar:** Clique e arraste na imagem abaixo para selecionar a área que deseja cortar. A área selecionada será redimensionada para as dimensões desejadas.")
+                st.markdown("**✂️ Ajuste a área de corte:**")
+                st.info("Use os controles para escolher qual parte da imagem será mantida no corte.")
                 
                 # Calcular escala para manter proporção e preencher o tamanho alvo
                 scale = max(new_width / image.width, new_height / image.height)
@@ -262,101 +259,73 @@ if uploaded_file is not None:
                 # Redimensionar mantendo proporção
                 temp_image = image.resize((scaled_width, scaled_height), Image.Resampling.LANCZOS)
                 
-                # Calcular dimensões do canvas (limitar a 800px de largura para melhor UX)
-                canvas_width = min(800, scaled_width)
-                canvas_height = int(canvas_width * scaled_height / scaled_width)
+                # Calcular limites de movimento
+                max_offset_x = max(0, scaled_width - new_width)
+                max_offset_y = max(0, scaled_height - new_height)
                 
-                # Redimensionar a imagem para o tamanho do canvas para exibição
-                display_image = temp_image.resize((canvas_width, canvas_height), Image.Resampling.LANCZOS)
+                # Chaves para estado da sessão
+                crop_key_x = f"crop_offset_x_{new_width}_{new_height}"
+                crop_key_y = f"crop_offset_y_{new_width}_{new_height}"
                 
-                # Converter para RGB se necessário (st_canvas funciona melhor com RGB)
-                if display_image.mode != 'RGB':
-                    display_image = display_image.convert('RGB')
+                # Inicializar valores
+                if crop_key_x not in st.session_state:
+                    st.session_state[crop_key_x] = max_offset_x // 2 if max_offset_x > 0 else 0
+                if crop_key_y not in st.session_state:
+                    st.session_state[crop_key_y] = max_offset_y // 2 if max_offset_y > 0 else 0
                 
-                # Criar uma cópia nova da imagem para evitar problemas de referência
-                canvas_bg_image = Image.new('RGB', (canvas_width, canvas_height))
-                canvas_bg_image.paste(display_image, (0, 0))
+                # Garantir limites
+                st.session_state[crop_key_x] = min(st.session_state[crop_key_x], max_offset_x)
+                st.session_state[crop_key_y] = min(st.session_state[crop_key_y], max_offset_y)
                 
-                # Canvas para seleção - usar apenas o canvas, sem fallback
-                canvas_result = st_canvas(
-                    fill_color="rgba(255, 165, 0, 0.3)",
-                    stroke_width=2,
-                    stroke_color="#FF6600",
-                    background_image=canvas_bg_image,
-                    update_streamlit=True,
-                    width=canvas_width,
-                    height=canvas_height,
-                    drawing_mode="rect",
-                    point_display_radius=0,
-                    key=f"crop_canvas_{new_width}_{new_height}",
-                )
-                
-                # Processar seleção do canvas
-                if canvas_result.json_data is not None:
-                    objects = json.loads(canvas_result.json_data)
+                # Controles de posicionamento
+                if max_offset_x > 0 or max_offset_y > 0:
+                    col_crop_x, col_crop_y = st.columns(2)
                     
-                    # Procurar por retângulos desenhados
-                    crop_rect = None
-                    if "objects" in objects:
-                        for obj in objects["objects"]:
-                            if obj.get("type") == "rect":
-                                crop_rect = obj
-                                break
-                    
-                    if crop_rect:
-                        # Obter coordenadas do retângulo no canvas
-                        canvas_x = crop_rect.get("left", 0)
-                        canvas_y = crop_rect.get("top", 0)
-                        canvas_w = crop_rect.get("width", 0)
-                        canvas_h = crop_rect.get("height", 0)
-                        
-                        # Converter coordenadas do canvas para coordenadas da imagem real
-                        scale_x = scaled_width / canvas_width
-                        scale_y = scaled_height / canvas_height
-                        
-                        # Se o usuário desenhou um retângulo válido, usar o centro da seleção
-                        if canvas_w > 10 and canvas_h > 10:
-                            # Calcular o centro da seleção do usuário
-                            canvas_center_x = canvas_x + canvas_w / 2
-                            canvas_center_y = canvas_y + canvas_h / 2
-                            
-                            # Converter para coordenadas da imagem real
-                            real_center_x = canvas_center_x * scale_x
-                            real_center_y = canvas_center_y * scale_y
-                            
-                            # Calcular posição do crop centrado na seleção do usuário
-                            left = int(real_center_x - new_width / 2)
-                            top = int(real_center_y - new_height / 2)
-                            
-                            # Garantir que não exceda os limites da imagem
-                            left = max(0, min(left, scaled_width - new_width))
-                            top = max(0, min(top, scaled_height - new_height))
-                            right = left + new_width
-                            bottom = top + new_height
-                            
-                            # Cortar a imagem usando a posição baseada na seleção do usuário
-                            resized_image = temp_image.crop((left, top, right, bottom))
+                    with col_crop_x:
+                        if max_offset_x > 0:
+                            crop_offset_x = st.slider(
+                                "Posição Horizontal",
+                                min_value=0,
+                                max_value=max_offset_x,
+                                value=int(st.session_state[crop_key_x]),
+                                step=1,
+                                help="Ajuste a posição horizontal da área de corte",
+                                key=f"slider_x_{new_width}_{new_height}"
+                            )
+                            st.session_state[crop_key_x] = crop_offset_x
                         else:
-                            # Seleção muito pequena, usar crop centralizado padrão
-                            left = (scaled_width - new_width) // 2
-                            top = (scaled_height - new_height) // 2
-                            right = left + new_width
-                            bottom = top + new_height
-                            resized_image = temp_image.crop((left, top, right, bottom))
-                    else:
-                        # Nenhuma seleção, usar crop centralizado padrão
-                        left = (scaled_width - new_width) // 2
-                        top = (scaled_height - new_height) // 2
-                        right = left + new_width
-                        bottom = top + new_height
-                        resized_image = temp_image.crop((left, top, right, bottom))
+                            crop_offset_x = 0
+                    
+                    with col_crop_y:
+                        if max_offset_y > 0:
+                            crop_offset_y = st.slider(
+                                "Posição Vertical",
+                                min_value=0,
+                                max_value=max_offset_y,
+                                value=int(st.session_state[crop_key_y]),
+                                step=1,
+                                help="Ajuste a posição vertical da área de corte",
+                                key=f"slider_y_{new_width}_{new_height}"
+                            )
+                            st.session_state[crop_key_y] = crop_offset_y
+                        else:
+                            crop_offset_y = 0
+                    
+                    if st.button("🎯 Centralizar corte", key=f"center_{new_width}_{new_height}"):
+                        st.session_state[crop_key_x] = max_offset_x // 2 if max_offset_x > 0 else 0
+                        st.session_state[crop_key_y] = max_offset_y // 2 if max_offset_y > 0 else 0
+                        st.rerun()
+                    
+                    left = st.session_state[crop_key_x]
+                    top = st.session_state[crop_key_y]
                 else:
-                    # Nenhuma seleção ainda, usar crop centralizado padrão
+                    # Sem espaço para mover, cortar centralizado
                     left = (scaled_width - new_width) // 2
                     top = (scaled_height - new_height) // 2
-                    right = left + new_width
-                    bottom = top + new_height
-                    resized_image = temp_image.crop((left, top, right, bottom))
+                
+                right = left + new_width
+                bottom = top + new_height
+                resized_image = temp_image.crop((left, top, right, bottom))
             else:  # Padding
                 # Calcular escala para manter proporção e caber no tamanho alvo
                 scale = min(new_width / image.width, new_height / image.height)
